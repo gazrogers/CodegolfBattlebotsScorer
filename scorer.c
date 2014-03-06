@@ -9,7 +9,6 @@
 #define MAXWEAPONS 100
 
 void cleararena(char arena[10][11]);
-void outputarena(char arena[10][11]);
 
 int main()
 {
@@ -62,8 +61,8 @@ int main()
                             arena[landmines[loop][0]][landmines[loop][1]]='L';
                         }
                     }
+                    
 printf("%s\n",arena);
-//for(loop=0;loop<10;loop++)printf("%s\n",arena[loop]);                    
 //send the arena to both bots to get the commands
 //interpret commands
 //do bot movement phase
@@ -82,17 +81,5 @@ void cleararena(char arena[10][11])
     for(loop=0;loop<10;loop++)
     {
         arena[loop][10]='\n';
-    }
-}
-void outputarena(char arena[10][11])
-{
-    int i,j;
-    for(j=0;j<10;j++)
-    {
-        for(i=0;i<10;i++)
-        {
-            printf("%c", arena[i][j]);
-        }
-        printf("\n");
     }
 }
