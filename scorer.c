@@ -3,12 +3,13 @@
 #include <string.h>
 
 #define NUMBOTS 2
-#define BOUTSPERMATCH 5
+#define BOUTSPERMATCH 1
 #define ROUNDSPERBOUT 1
 #define MAXFILENAMESIZE 100
 #define MAXWEAPONS 100
 
-void outputarena(char arena[10][10]);
+void cleararena(char arena[10][11]);
+void outputarena(char arena[10][11]);
 
 int main()
 {
@@ -21,7 +22,7 @@ int main()
     int bullets[MAXWEAPONS][3]={-1};
     int landmines[MAXWEAPONS][2]={-1};
     int paralyzedturnsremaining=0;
-    char arena[10][10];
+    char arena[10][11];
 
     memset(missiles, -1, sizeof(missiles));
     memset(bullets, -1, sizeof(bullets));
@@ -32,10 +33,10 @@ int main()
     {
         for(bot2=bot1+1;bot2<NUMBOTS;bot2++)
         {
-            printf("%s vs %s ",bots[bot1],bots[bot2]);
+            //printf("%s vs %s ",bots[bot1],bots[bot2]);
             for(bout=0;bout<BOUTSPERMATCH;bout++)
             {
-                printf("Bout %d\n",bout);
+                //printf("Bout %d\n",bout);
                 //setup the arena for the bout
                 bot1x=0;
                 bot2x=9;
@@ -45,7 +46,7 @@ int main()
                 for(round=0;round<ROUNDSPERBOUT;round++)
                 {
                     //draw the arena based on current state
-                    memset(arena, '.', sizeof(arena));
+                    cleararena(arena);
                     for(loop=0;loop<MAXWEAPONS;loop++)
                     {
                         if(missiles[loop][0]!= -1)
@@ -61,7 +62,8 @@ int main()
                             arena[landmines[loop][0]][landmines[loop][1]]='L';
                         }
                     }
-                    
+printf("%s\n",arena);
+//for(loop=0;loop<10;loop++)printf("%s\n",arena[loop]);                    
 //send the arena to both bots to get the commands
 //interpret commands
 //do bot movement phase
@@ -69,12 +71,20 @@ int main()
 //check if there's a winner
                 }
             }
-            printf("\n");
+            //printf("\n");
         }
     }
 }
-
-void outputarena(char arena[10][10])
+void cleararena(char arena[10][11])
+{
+    int loop;
+    memset(arena, '.', 110);
+    for(loop=0;loop<10;loop++)
+    {
+        arena[loop][10]='\n';
+    }
+}
+void outputarena(char arena[10][11])
 {
     int i,j;
     for(j=0;j<10;j++)
