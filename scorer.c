@@ -3,12 +3,12 @@
 #include <string.h>
 #include <stdbool.h>
 
-#define NUMBOTS 3
+#define NUMBOTS 2
 #define BOUTSPERMATCH 5
 #define ROUNDSPERBOUT 1000
 #define MAXFILENAMESIZE 100
 #define MAXWEAPONS 100
-#define DISPLAYBOUTS false
+#define DISPLAYBOUTS true
 
 typedef struct
 {
@@ -34,7 +34,7 @@ int main()
     int bout, round, loop, totalprojectiles, dx, dy;
     char bots[NUMBOTS][MAXFILENAMESIZE]=
     {
-        "./donowt              ",
+        //"./donowt              ",
         "php -f huggybot.php   ",
         "python mineminemine.py",
     };
@@ -335,13 +335,13 @@ int main()
                 // who has won the bout
                 if(b1.energy<b2.energy)
                 {
-                    bot1bouts+=1;
-                    boutswon[bot1]+=1;
+                    bot2bouts+=1;
+                    boutswon[bot2]+=1;
                 }
                 else if(b2.energy<b1.energy)
                 {
-                    bot2bouts+=1;
-                    boutswon[bot2]+=1;
+                    bot1bouts+=1;
+                    boutswon[bot1]+=1;
                 }
             }
             if(bot1bouts>bot2bouts)
