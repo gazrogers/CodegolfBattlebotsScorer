@@ -3,12 +3,12 @@
 #include <string.h>
 #include <stdbool.h>
 
-#define NUMBOTS 2
+#define NUMBOTS 3
 #define BOUTSPERMATCH 5
 #define ROUNDSPERBOUT 1000
 #define MAXFILENAMESIZE 100
 #define MAXWEAPONS 100
-#define DISPLAYBOUTS true
+#define DISPLAYBOUTS false
 
 typedef struct
 {
@@ -34,8 +34,9 @@ int main()
     int bout, round, loop, totalprojectiles, dx, dy;
     char bots[NUMBOTS][MAXFILENAMESIZE]=
     {
-        "./donowt           ",
-        "php -f huggybot.php"
+        "./donowt              ",
+        "php -f huggybot.php   ",
+        "python mineminemine.py",
     };
     char directions[8][3]={"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
     char openstring[5000], argumentstring[4000], bot1string[6], bot2string[6];
@@ -48,9 +49,6 @@ int main()
     char arena[10][11];
     char projectiles[300][10];
 
-    memset(missiles, -1, sizeof(missiles));
-    memset(bullets, -1, sizeof(bullets));
-    memset(landmines, -1, sizeof(landmines));
     for(loop=0;loop<NUMBOTS;loop++)
     {
         matcheswon[loop]=0;
@@ -69,11 +67,15 @@ int main()
             {
                 printf("%d ",bout);
                 //setup the arena for the bout
-                b1.x=0;
+                b1.x=1;b1.y=1;
                 b2.x=9;
-                b1.y=rand()%10;
+                //b1.y=rand()%10;
                 b2.y=rand()%10;
                 b1.energy=b2.energy=10;
+                //clear the previous stuff
+                memset(missiles, -1, sizeof(missiles));
+                memset(bullets, -1, sizeof(bullets));
+                memset(landmines, -1, sizeof(landmines));
                 for(round=0;round<ROUNDSPERBOUT;round++)
                 {
                     //draw the arena based on current state
@@ -153,6 +155,7 @@ int main()
                         printf("%s", arena);
                         sprintf(bot1string, "A %d\n", b1.energy);
                         sprintf(bot2string, "B %d\n", b2.energy);
+                        printf("%s%s", bot1string, bot2string);
                     }
 
                     //do bot movement phase
@@ -163,7 +166,7 @@ int main()
                         dx=dy=0;
                         dx=getxmove(b1.cmd);
                         dy=getymove(b1.cmd);
-                        if(newposinbounds(b1.x, b1.y, dx,dy))
+                        if(newposinbounds(b1.x, b1.y, dx, dy))
                         {
                             if(!(b1.x+dx==b2.x) || !(b1.y+dy==b2.y))
                             {
@@ -176,7 +179,7 @@ int main()
                         dx=dy=0;
                         dx=getxmove(b2.cmd);
                         dy=getymove(b2.cmd);
-                        if(newposinbounds(b2.x, b2.y, dx,dy))
+                        if(newposinbounds(b2.x, b2.y, dx, dy))
                         {
                             if(!(b2.x+dx==b1.x) || !(b2.y+dy==b1.y))
                             {
@@ -189,7 +192,7 @@ int main()
                             dx=dy=0;
                             dx=getxmove(b1.cmd);
                             dy=getymove(b1.cmd);
-                            if(newposinbounds(b1.x, b1.y, dx,dy))
+                            if(newposinbounds(b1.x, b1.y, dx, dy))
                             {
                                 if(!(b1.x+dx==b2.x) || !(b1.y+dy==b2.y))
                                 {
@@ -407,7 +410,7 @@ int directhit(Bot bot, int landmine[2])
 }
 int landminecollision(int landmine1[2], int landmine2[2])
 {
-    return (abs(landmine1[1]-landmine2[1])<2 && abs(landmine1[0]-landmine2[0])<2);
+    return ((landmine1[1]==landmine2[1]) && abs(landmine1[0]==landmine2[0]));
 }
 int inshrapnelrange(Bot bot, int landmine[2])
 {
