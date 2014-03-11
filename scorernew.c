@@ -1025,7 +1025,7 @@ void add_bullet(int bullets[][3], int *num_bullets, int x, int y, int d)
   if (*(num_bullets) == MAXWEAPONS) return; // Damn!
   
   int i;
-  for (i == 0; i < MAXWEAPONS; i++)
+  for (i = 0; i < MAXWEAPONS; i++)
   {
     if (bullets[i][0] == -1)
     {
@@ -1096,7 +1096,7 @@ void add_missile(int missiles[][3], int *num_missiles, int x, int y, int d)
   if (*(num_missiles) == MAXWEAPONS) return; // Damn!
   
   int i;
-  for (i == 0; i < MAXWEAPONS; i++)
+  for (i = 0; i < MAXWEAPONS; i++)
   {
     if (missiles[i][0] == -1)
     {
