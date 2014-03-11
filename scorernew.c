@@ -331,9 +331,10 @@ int main(int argc, char **argv)
 
             arena[b1.y][b1.x]='A';
             arena[b2.y][b2.x]='B';
-            printf("%s", arena);
+            printf("%s\n", arena);
+            printf("!%s!\n", b1.cmd);
+            printf("!%s!\n", b2.cmd);
           }
-
           
           /*
            * Process bot movement first, assuming they are not still paralyzed
@@ -346,7 +347,7 @@ int main(int argc, char **argv)
              * blocked by bot 2, try moving it again.
              */
             bool moved = move_bot(&b1, &b2);
-            move_bot(&b1, &b2);
+            move_bot(&b2, &b1);
             if (!moved) move_bot(&b1, &b2);
             
             
@@ -442,9 +443,9 @@ int main(int argc, char **argv)
            * Otherwise, fire whatever weapons the bots selected.
            */
           else
-          {
+          {printf("Mines before: %d\n", num_landmines);
             deploy_weapons(&b1, &b2, bullets, &num_bullets, missiles, &num_missiles, landmines, &num_landmines);
-            deploy_weapons(&b2, &b1, bullets, &num_bullets, missiles, &num_missiles, landmines, &num_landmines);
+            deploy_weapons(&b2, &b1, bullets, &num_bullets, missiles, &num_missiles, landmines, &num_landmines);printf("Mines after: %d\n", num_landmines);
           }
           
           
@@ -593,6 +594,7 @@ int main(int argc, char **argv)
             }
           }
           
+usleep(250000);
           
           /*
            * If either bot is out of energy, the bout is over.
@@ -1178,17 +1180,17 @@ int flak_missile(Bot bot, int missiles[][3], int index)
  *   Nothing
  */
 void add_landmine(int landmines[][2], int *num_landmines, int x, int y)
-{
+{printf("Adding mine at %d %d\nNumber of mines on entry: %d\n", x, y, *num_landmines);
   if (*(num_landmines) == MAXWEAPONS) return; // Damn!
   
   int i;
-  for (i == 0; i < MAXWEAPONS; i++)
+  for (i = 0; i < MAXWEAPONS; i++)
   {
     if (landmines[i][0] == -1)
     {
       landmines[i][0] = x;
       landmines[i][1] = y;
-      *(num_landmines)++;
+      *(num_landmines)++;printf("Number of mines on exit: %d\n", *num_landmines);
       return;
     }
   }
