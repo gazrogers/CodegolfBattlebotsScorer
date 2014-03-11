@@ -110,7 +110,7 @@ int main()
                     sprintf(bot1string, "Y %d\n", b1.energy);
                     sprintf(bot2string, "X %d\n", b2.energy);
                     strcpy(argumentstring, "'");
-                    strcat(argumentstring, arena);
+                    strncat(argumentstring, *arena, 10*11);
                     strcat(argumentstring, bot1string);
                     strcat(argumentstring, bot2string);
                     for(loop=0;loop<totalprojectiles;loop++)
@@ -131,7 +131,7 @@ int main()
                     sprintf(bot2string, "Y %d\n", b2.energy);
                     sprintf(bot1string, "X %d\n", b1.energy);
                     strcpy(argumentstring, "'");
-                    strcat(argumentstring, arena);
+                    strncat(argumentstring, *arena, 10*11);
                     strcat(argumentstring, bot2string);
                     strcat(argumentstring, bot1string);
                     for(loop=0;loop<totalprojectiles;loop++)
@@ -234,9 +234,15 @@ int main()
                         paralyzedturnsremaining-=1;
                     }
                     //do weapons firing phase
-                    if(strcmp(b1.cmd, "P")==0 || strcmp(b2.cmd, "P")==0)
+                    if(strcmp(b1.cmd, "P")==0)
                     {
                         paralyzedturnsremaining=2;
+                        b1.energy--;
+                    }
+                    else if(strcmp(b2.cmd, "P")==0)
+                    {
+                        paralyzedturnsremaining=2;
+                        b2.energy--;
                     }
                     deployweapons(&b1, &b2, bullets, missiles, landmines, directions);
                     deployweapons(&b2, &b1, bullets, missiles, landmines, directions);
@@ -296,6 +302,10 @@ int main()
                                     if(directhit(b1, missiles[loop]))
                                     {
                                         b1.energy-=3;
+                                        if(inshrapnelrange(b2, missiles[loop]))
+                                        {
+                                            b2.energy-=1;
+                                        }
                                         missiles[loop][0]= -1;
                                         missiles[loop][1]= -1;
                                         missiles[loop][2]= -1;
@@ -303,6 +313,10 @@ int main()
                                     if(directhit(b2, missiles[loop]))
                                     {
                                         b2.energy-=3;
+                                        if(inshrapnelrange(b1, missiles[loop]))
+                                        {
+                                            b1.energy-=1;
+                                        }
                                         missiles[loop][0]= -1;
                                         missiles[loop][1]= -1;
                                         missiles[loop][2]= -1;
