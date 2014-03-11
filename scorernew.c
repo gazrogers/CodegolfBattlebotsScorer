@@ -332,8 +332,6 @@ int main(int argc, char **argv)
             arena[b1.y][b1.x]='A';
             arena[b2.y][b2.x]='B';
             printf("%s\n", arena);
-            printf("!%s!\n", b1.cmd);
-            printf("!%s!\n", b2.cmd);
           }
           
           /*
@@ -443,9 +441,9 @@ int main(int argc, char **argv)
            * Otherwise, fire whatever weapons the bots selected.
            */
           else
-          {printf("Mines before: %d\n", num_landmines);
+          {
             deploy_weapons(&b1, &b2, bullets, &num_bullets, missiles, &num_missiles, landmines, &num_landmines);
-            deploy_weapons(&b2, &b1, bullets, &num_bullets, missiles, &num_missiles, landmines, &num_landmines);printf("Mines after: %d\n", num_landmines);
+            deploy_weapons(&b2, &b1, bullets, &num_bullets, missiles, &num_missiles, landmines, &num_landmines);
           }
           
           
@@ -593,8 +591,7 @@ int main(int argc, char **argv)
               k--;
             }
           }
-          
-usleep(250000);
+
           
           /*
            * If either bot is out of energy, the bout is over.
@@ -606,13 +603,13 @@ usleep(250000);
         /*
          * The bout is over. Update the winner's stats, if we have one.
          */
-        if(b1.energy < b2.energy)
+        if(b1.energy > b2.energy)
         {
           if (bot1 == i) bot_i_bouts++;
           else bot_j_bouts++;
           boutswon[bot1]++;
         }
-        else if(b2.energy < b1.energy)
+        else if(b2.energy > b1.energy)
         {
           if (bot2 == i) bot_i_bouts++;
           else bot_j_bouts++;
@@ -1030,7 +1027,7 @@ void add_bullet(int bullets[][3], int *num_bullets, int x, int y, int d)
       bullets[i][0] = x;
       bullets[i][1] = y;
       bullets[i][2] = d;
-      *(num_bullets)++;
+      (*num_bullets)++;
       return;
     }
   }
@@ -1101,7 +1098,7 @@ void add_missile(int missiles[][3], int *num_missiles, int x, int y, int d)
       missiles[i][0] = x;
       missiles[i][1] = y;
       missiles[i][2] = d;
-      *(num_missiles)++;
+      (*num_missiles)++;
       return;
     }
   }
@@ -1180,7 +1177,7 @@ int flak_missile(Bot bot, int missiles[][3], int index)
  *   Nothing
  */
 void add_landmine(int landmines[][2], int *num_landmines, int x, int y)
-{printf("Adding mine at %d %d\nNumber of mines on entry: %d\n", x, y, *num_landmines);
+{
   if (*(num_landmines) == MAXWEAPONS) return; // Damn!
   
   int i;
@@ -1190,7 +1187,7 @@ void add_landmine(int landmines[][2], int *num_landmines, int x, int y)
     {
       landmines[i][0] = x;
       landmines[i][1] = y;
-      *(num_landmines)++;printf("Number of mines on exit: %d\n", *num_landmines);
+      (*num_landmines)++;
       return;
     }
   }
