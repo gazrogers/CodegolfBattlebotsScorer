@@ -38,14 +38,16 @@
 
 
 /*
- * Internal representation of a bot. Note that the path
- * to the bot's executable is not included here, but tracked
- * separately in main().
+ * Internal representation of a bot.
  */
 typedef struct
 {
+  char *cl;
   int x, y, energy;
   char cmd[5];
+  int recent_bouts;
+  int bouts;
+  int matches;
 } Bot;
 
 
@@ -69,6 +71,7 @@ void deploy_weapons(Bot *, Bot *, int [][3], int *, int [][3], int *, int [][2],
 void clear_arena(char arena[10][11]);
 void make_cl(char *output, char arena[][11], char projectiles[][10], int cnt_projectiles, char* path, Bot bot1, Bot bot2);
 bool move_bot(Bot *bot, Bot *other);
+void exec_bot(int [][3], int, int [][3], int, int [][2], int, Bot *, Bot *, char [10*11+1]);
 
 
 /*
@@ -76,7 +79,7 @@ bool move_bot(Bot *bot, Bot *other);
  */
 void add_bullet(int [][3], int *, int, int, int);
 void del_bullet(int [][3], int *, int);
-int hit_bullet(Bot, int [][3], int);
+void update_bullets(int [][3], int *, Bot *, Bot *);
 
 
 /*
@@ -84,8 +87,7 @@ int hit_bullet(Bot, int [][3], int);
  */
 void add_missile(int [][3], int *, int, int, int);
 void del_missile(int [][3], int *, int);
-int hit_missile(Bot, int [][3], int);
-int flak_missile(Bot, int [][3], int);
+void update_missiles(int [][3], int *, Bot *, Bot *);
 
 
 /*
@@ -93,10 +95,8 @@ int flak_missile(Bot, int [][3], int);
  */
 void add_landmine(int [][2], int *, int, int);
 void del_landmine(int [][2], int *, int);
-int hit_landmine(Bot, int [][2], int);
-int flak_landmine(Bot, int [][2], int);
+void update_landmines(int [][2], int *, Bot *, Bot *);
 int collide_landmine(int, int, int [][2], int);
-
 
 
 /*
@@ -108,35 +108,30 @@ int main(int argc, char **argv)
 
   
   /*
-   * Set up bot command-line array from our args. Only one bot? Copy it
-   * into the first two spots so it can play against itself.
+   * Set up the bot array from our args. Only one bot? Copy it into the first
+   * two spots so it can play against itself.
    */
   int numbots;
-  if (argc > 2) numbots = argc-1;
+  if (argc > 2) numbots = argc - 1;
   else if (argc == 2) numbots = 2;
   else
   {
     printf("Usage:\n%s <bot 1 cmd line> [bot 2 cmd line] ...\n", argv[0]);
-	return 1;
+	  return 1;
   }
   
-  char bots[numbots][MAXFILENAMESIZE];
+  Bot bots[numbots];
   for (loop = 1; loop < argc; loop++)
   {
-    strncpy(bots[loop-1], argv[loop], MAXFILENAMESIZE);
+    bots[loop - 1].cl = argv[loop];
+    bots[loop - 1].bouts = 0;
+    bots[loop - 1].matches = 0;
   }
-  if (argc == 2) strncpy(bots[1], argv[1], MAXFILENAMESIZE);
-
-  
-  /*
-   * We track individual bouts won for each bot, along with matches won.
-   */
-  int matcheswon[numbots];
-  int boutswon[numbots];
-  for(loop = 0; loop < numbots; loop++)
+  if (argc == 2)
   {
-    matcheswon[loop] = 0;
-    boutswon[loop] = 0;
+    bots[1].cl = argv[1];
+    bots[1].bouts = 0;
+    bots[1].matches = 0;
   }
 
   
@@ -158,12 +153,12 @@ int main(int argc, char **argv)
     for(j = i + 1; j < numbots; j++)
     {
       /*
-       * Bots i and j are going to compete in a best-of-n series of matches.
+       * Bot i will battle bot j in a best-of-n competition.
        */
-      int bot_i_bouts = 0;
-	    int bot_j_bouts = 0;
-      
-      
+      Bot *botI = &bots[i];
+      Bot *botJ = &bots[j];
+
+       
       /*
        * bullets and missiles will contain the coordinates and directions of
        * all projectiles in flights. Non-existent entries are marked with -1
@@ -212,16 +207,16 @@ int main(int argc, char **argv)
          * has a slight advantage: if both bots attempt to move to the same
          * position, bot 2 always wins.
          */
-        int bot1, bot2;
+        Bot *bot1, *bot2;
         if (rand() % 2)
         {
-          bot1 = i;
-          bot2 = j;
+          bot1 = botI;
+          bot2 = botJ;
         }
         else
         {
-          bot1 = j;
-          bot2 = i;
+          bot1 = botJ;
+          bot2 = botI;
         }
       
       
@@ -229,14 +224,13 @@ int main(int argc, char **argv)
          * Bot 1 starts at the far left, bot 2 starts at the far right.
 		     * Vertical positions are random. Both bots start with max energy.
 		     */
-        Bot b1, b2;
-        b1.x=0;
-        b2.x=9;
-        b1.y=rand()%10;
-        b2.y=rand()%10;
-        b1.energy=b2.energy=10;
-		
-		
+        bot1->x = 0; bot1->y = rand()%10;
+        bot1->recent_bouts = 0; bot1->energy = 10;
+        
+        bot2->x = 9; bot2->y = rand()%10;
+        bot2->recent_bouts = 0; bot2->energy = 10;
+
+        
 		    /*
 		     * The bout continues until the maximum number of rounds is met or
 		     * one bot's energy is reduced to 0.
@@ -245,94 +239,25 @@ int main(int argc, char **argv)
         for(round = 0; round < ROUNDSPERBOUT; round++)
         {
           /*
-           * Draw the arena to a string array. Note that missiles in-flight
-           * conceal bullets in-flight, and land-mines on the ground conceal 
-           * both. Each line ends with a newline character. Each projectile
-           * gets its own line in the projectiles list, too, describing its
-           * current position and direction.
+           * Execute both bots.
            */
-          char arena[10][11];
-          clear_arena(arena);
+          char arena[10*11+1];
+          exec_bot(bullets, num_bullets, missiles, num_missiles, landmines, num_landmines, bot1, bot2, arena);
+          exec_bot(bullets, num_bullets, missiles, num_missiles, landmines, num_landmines, bot2, bot1, NULL);
 
-          char projectiles[300][10];
-          int totalprojectiles=0;
-          
-          int k = num_bullets;
-          for(loop = 0; k > 0; loop++)
-          {
-            if(bullets[loop][0] != -1)
-            {
-              arena[bullets[loop][1]][bullets[loop][0]]='B';
-              sprintf(projectiles[totalprojectiles], "%c %d %d %s\n", 'B', bullets[loop][0], bullets[loop][1], num2heading(bullets[loop][2]));
-              totalprojectiles++;
-              k--;
-            }
-          }
-
-          k = num_missiles;
-          for (loop = 0; k > 0; loop++)
-          {
-            if(missiles[loop][0]!= -1)
-            {
-              arena[missiles[loop][1]][missiles[loop][0]]='M';
-              sprintf(projectiles[totalprojectiles], "%c %d %d %s\n", 'M', missiles[loop][0], missiles[loop][1], num2heading(missiles[loop][2]));
-              totalprojectiles++;
-              k--;
-            }
-          }
-          
-          k = num_landmines;
-          for (loop = 0; k > 0; loop++)
-          {
-            if(landmines[loop][0]!= -1)
-            {
-              arena[landmines[loop][1]][landmines[loop][0]]='L';
-              sprintf(projectiles[totalprojectiles], "%c %d %d\n", 'L', landmines[loop][0], landmines[loop][1]);
-              totalprojectiles++;
-              k--;
-            }            
-          }
-          
-          
-          /*
-           * Call the first bot and get its response.
-           */
-          char cl1[5000];
-          make_cl(cl1, arena, projectiles, totalprojectiles, bots[bot1], b1, b2);
-          FILE *fp1 = popen(cl1, "r");
-          fgets(b1.cmd, 5, fp1);
-          fflush(NULL);
-          pclose(fp1);
-
-          
-          /*
-           * Call the second bot and get its response.
-           */
-          char cl2[5000];
-          make_cl(cl2, arena, projectiles, totalprojectiles, bots[bot2], b2, b1);
-          FILE *fp2 = popen(cl2, "r");
-          fgets(b2.cmd, 5, fp2);
-          fflush(NULL);
-          pclose(fp2);
-          
-          
-          /*
-           * Optional pretty printing.
-           */
           if(DISPLAYBOUTS)
           {
             printf("\033c");
 
             printf("Match %d of %d\n", match+1, num_matches);
-            printf("A: %s (%d match wins, %d bout wins, %d energy)\n", bots[bot1], matcheswon[bot1], boutswon[bot1], b1.energy);
-            printf("B: %s (%d match wins, %d bout wins, %d energy)\n", bots[bot2], matcheswon[bot2], boutswon[bot2], b2.energy);
+            printf("Y: %s (%d match wins, %d bout wins, %d energy)\n", bot1->cl, bot1->matches, bot1->bouts, bot1->energy);
+            printf("X: %s (%d match wins, %d bout wins, %d energy)\n", bot2->cl, bot2->matches, bot2->bouts, bot2->energy);
             printf("Bout %d of %d\n", bout+1, BOUTSPERMATCH);
             printf("Round %d\n\n", round+1);
-
-            arena[b1.y][b1.x]='A';
-            arena[b2.y][b2.x]='B';
             printf("%s\n", arena);
+            //getchar();
           }
+          
           
           /*
            * Process bot movement first, assuming they are not still paralyzed
@@ -344,102 +269,38 @@ int main(int argc, char **argv)
              * Move bot 1, then bot 2, then, if bot 1 had previously been
              * blocked by bot 2, try moving it again.
              */
-            bool moved = move_bot(&b1, &b2);
-            move_bot(&b2, &b1);
-            if (!moved) move_bot(&b1, &b2);
+            bool moved = move_bot(bot1, bot2);
+            move_bot(bot2, bot1);
+            if (!moved) move_bot(bot1, bot2);
             
             
             /*
-             * Loop through each landmine and check if either bot just moved
-             * on top of it.
+             * Check if either bot stepped on a landmine.
              */
-            k = num_landmines;
-            for(loop = 0; k > 0; loop++)
-            {
-              if(landmines[loop][0] != -1)
-              {
-                /*
-                 * Bot 1 is standing on this landmine?
-                 */
-                if(hit_landmine(b1, landmines, loop))
-                {
-                  /*
-                   * Bomb went off, bot 1 takes the brunt of the damage.
-                   */
-                  b1.energy -= 2;
-                  
-                  /*
-                   * Did bot 2 get hit by shrapnel?
-                   */
-                  if(flak_landmine(b2, landmines, loop))
-                  {
-                    b2.energy-=1;
-                  }
-                  
-                  /*
-                   * This landmine is gone now.
-                   */
-                  del_landmine(landmines, &num_landmines, loop);
-                }
-                
-                /*
-                 * Bot 2 is standing on this landmine?
-                 */
-                else if(hit_landmine(b2, landmines, loop))
-                {
-                  /*
-                   * Bomb went off, bot 2 takes the brunt of the damage.
-                   */
-                  b2.energy-=2;
-                  
-                  
-                  /*
-                   * Did bot 2 get hit by shrapnel?
-                   */
-                  if(flak_landmine(b1, landmines, loop))
-                  {
-                    b1.energy-=1;
-                  }
-                  
-                  /*
-                   * This landmine is gone now.
-                   */
-                  del_landmine(landmines, &num_landmines, loop);
-                }
-                
-                k--;
-              }
-            }
+            update_landmines(landmines, &num_landmines, bot1, bot2);
+            if (bot1->energy < 1 || bot2->energy < 1) break;
           }
           else
           {
             paralyzedturnsremaining-=1;
           }
-          
-          
-          /*
-           * The bout might be over right now, if one or both bots were
-           * hit by a landmine/shrapnel. If so, we shouldn't let them fire
-           * any more shots.
-           */
-          if (b1.energy < 1 || b2.energy < 1) break;
-          
+
           
           /*
            * If either (or both!) bots fired the EMP, both bots will be
            * unable to move for the next two rounds. See the -if- check
            * above. NEW - bot firing EMP loses one energy point.
            */
-           if (strcmp(b1.cmd, "P") == 0)
-           {
-             paralyzedturnsremaining = 2;
-             b1.energy--;
-           }
-           else if(strcmp(b2.cmd, "P") == 0)
-           {
-             paralyzedturnsremaining = 2;
-             b2.energy--;
-           }
+          if (strcmp(bot1->cmd, "P") == 0)
+          {
+            paralyzedturnsremaining = 2;
+            bot1->energy--;
+          }
+          else if(strcmp(bot2->cmd, "P") == 0)
+          {
+            paralyzedturnsremaining = 2;
+            bot2->energy--;
+          }
           
           
           /*
@@ -447,178 +308,33 @@ int main(int argc, char **argv)
            */
           else
           {
-            deploy_weapons(&b1, &b2, bullets, &num_bullets, missiles, &num_missiles, landmines, &num_landmines);
-            deploy_weapons(&b2, &b1, bullets, &num_bullets, missiles, &num_missiles, landmines, &num_landmines);
+            deploy_weapons(bot1, bot2, bullets, &num_bullets, missiles, &num_missiles, landmines, &num_landmines);
+            deploy_weapons(bot2, bot1, bullets, &num_bullets, missiles, &num_missiles, landmines, &num_landmines);
           }
           
           
           /*
-           * Move all bullets three places along their trajectories.
+           * Move all bullets and missiles along their trajectories and check if either
+           * bot is out of energy.
            */
-          k = num_bullets;
-          for(loop = 0; k > 0; loop++)
-          {
-            if(bullets[loop][0] != -1)
-            {
-              int dx = heading2dx(bullets[loop][2]);
-              int dy = heading2dy(bullets[loop][2]);
-              int moves;
-              for(moves = 0; moves < 3; moves++)
-              {
-                /*
-                 * If the bullet will still be in-bounds, move it.
-                 */
-                if(newposinbounds(bullets[loop][0], bullets[loop][1], dx, dy))
-                {
-                  bullets[loop][0] += dx;
-                  bullets[loop][1] += dy;
-                  
-                  /*
-                   * Was bot 1 hit by this bullet? If so, remove it.
-                   */
-                  if (hit_bullet(b1, bullets, loop))
-                  {
-                    b1.energy--;
-                    del_bullet(bullets, &num_bullets, loop);
-                  }
-                  
-                  /*
-                   * How about bot 2?
-                   */
-                  else if (hit_bullet(b2, bullets, loop))
-                  {
-                    b2.energy--;
-                    del_bullet(bullets, &num_bullets, loop);
-                  }
-                }
-                
-                /*
-                 * If the bullet has reached an outer wall, remove it.
-                 */
-                else
-                {
-                  del_bullet(bullets, &num_bullets, loop);
-                }
-              }
-              
-              k--;
-            }
-          };
-          
-          
-          /*
-           * Move all missiles two places along their trajectories.
-           */
-          k = num_missiles;
-          for(loop = 0; k > 0; loop++)
-          {
-            if(missiles[loop][0] != -1)
-            {
-              int dx = heading2dx(missiles[loop][2]);
-              int dy = heading2dy(missiles[loop][2]);
-              
-              /*
-               * If the missile will still be in-bounds, move it.
-               */
-              int moves;
-              for(moves=0;moves<2;moves++)
-              {
-                bool removed = false;
-                
-                if(newposinbounds(missiles[loop][0], missiles[loop][1], dx, dy))
-                {
-                  missiles[loop][0] += dx;
-                  missiles[loop][1] += dy;
-
-
-                  /*
-                   * Was bot 1 hit by this missile? If so, note that it should
-                   * be removed.
-                   */
-                  if(hit_missile(b1, missiles, loop))
-                  {
-                    b1.energy -= 3;
-                    removed = true;
-                  }
-                  
-                  
-                  /*
-                   * How about bot 2?
-                   */
-                  else if(hit_missile(b2, missiles, loop))
-                  {
-                    b2.energy -= 3;
-                    removed = true;
-                  }
-                }
-                
-                /*
-                 * If the missile has reached an outer wall, note that it
-                 * should be removed.
-                 */
-                else
-                {
-                  removed = true;
-                }
-                
-                
-                /*
-                 * If a missile is to be removed, it causes shrapnel damage
-                 * first.
-                 */
-                if (removed)
-                {
-                  /*
-                   * Is bot 1 catching flak?
-                   */
-                  if(flak_missile(b1, missiles, loop))
-                  {
-                    b1.energy--;
-                  }
-                  
-                  
-                  /*
-                   * Is bot 2 catching flak?
-                   */
-                  if(flak_missile(b2, missiles, loop))
-                  {
-                    b2.energy--;
-                  }
-                  
-                  
-                  /*
-                   * Remove the missile.
-                   */
-                  del_missile(missiles, &num_missiles, loop);
-                }
-              }
-              
-              k--;
-            }
-          }
-
-          
-          /*
-           * If either bot is out of energy, the bout is over.
-           */
-          if (b1.energy < 1 || b2.energy < 1) break;
+          update_bullets(bullets, &num_bullets, bot1, bot2);
+          update_missiles(missiles, &num_missiles, bot1, bot2);
+          if (bot1->energy < 1 || bot2->energy < 1) break;
         }
         
         
         /*
          * The bout is over. Update the winner's stats, if we have one.
          */
-        if(b1.energy > b2.energy)
+        if(bot1->energy > bot2->energy)
         {
-          if (bot1 == i) bot_i_bouts++;
-          else bot_j_bouts++;
-          boutswon[bot1]++;
+          bot1->recent_bouts++;
+          bot1->bouts++;
         }
-        else if(b2.energy > b1.energy)
+        else if(bot2->energy > bot1->energy)
         {
-          if (bot2 == i) bot_i_bouts++;
-          else bot_j_bouts++;
-          boutswon[bot2]++;
+          bot2->recent_bouts++;
+          bot2->bouts++;
         }
       }
       
@@ -626,14 +342,8 @@ int main(int argc, char **argv)
       /*
        * The match is over. Update the winner's stats, if we have one.
        */
-      if(bot_i_bouts > bot_j_bouts)
-      {
-        matcheswon[i]++;
-      }
-      else if(bot_i_bouts < bot_j_bouts)
-      {
-        matcheswon[j]++;
-      }
+      if(botI->recent_bouts > botJ->recent_bouts) botI->matches++;
+      else if(botJ->recent_bouts > botI->recent_bouts) botJ->matches++;
     }
   }
 
@@ -642,10 +352,9 @@ int main(int argc, char **argv)
    * The competition is over. Display the final results.
    */
   printf("\nResults:\n");
-  printf("Bot\t\t\tMatches\tBouts\n");
   for(loop = 0; loop < numbots; loop++)
   {
-    printf("%s\t%d\t%d\n", bots[loop], matcheswon[loop], boutswon[loop]);
+    printf("%s: %d match wins (%d total bout wins)\n", bots[loop].cl, bots[loop].matches, bots[loop].bouts);
   }
 }
 
@@ -865,11 +574,13 @@ void deploy_weapons(Bot *bot, Bot *other, int bullets[][3], int *num_bullets, in
              * since he would have set off the existing mine when we stepped
              * on it, but we can both be caught in the blast.
              */
-            if (flak_landmine(*bot, landmines, i))
+            if (   abs(bot->x - landmines[i][0]) < 2
+                && abs(bot->y - landmines[i][1]) < 2)
             {
               bot->energy--;
             }
-            if (flak_landmine(*other, landmines, i))
+            if (   abs(other->x - landmines[i][0]) < 2
+                && abs(other->y - landmines[i][1]) < 2)
             {
               other->energy--;
             }
@@ -892,87 +603,6 @@ void deploy_weapons(Bot *bot, Bot *other, int bullets[][3], int *num_bullets, in
       add_landmine(landmines, num_landmines, x, y);
     }
   }
-}
-
-
-
-/*
- * Initialize an arena array.
- *
- * Takes:
- *   arena: Arena array to be initialized.
- *
- * Returns:
- *   Nothing
- */
-void clear_arena(char arena[10][11])
-{
-  int loop;
-  memset(arena, '.', 110);
-  for(loop=0;loop<10;loop++)
-  {
-    arena[loop][10]='\n';
-  }
-}
-
-
-
-/*
- * Make the command line to be sent to a bot.
- *
- * Takes:
- *   output: pointer to the destination where the command line
-*    string should be written.
- *   arena: Arena array
- *   projectiles: Projectile strings
- *   cnt_projectiles: Number of projectile strings
- *   bot1: The bot for whom this command line argument is intended
- *   bot2: The first bot's opponent
- *
- * Returns:
- *   Nothing; modifies output in-place
- */
-void make_cl(char *output, char arena[][11], char projectiles[][10], int cnt_projectiles, char* path, Bot bot1, Bot bot2)
-{
-  /*
-   * Write the first bot as a "Y" and the second bot as an "X" in the arena,
-   * remembering what was there originally.
-   */
-  char at_y = arena[bot1.y][bot1.x];
-  char at_x = arena[bot2.y][bot2.x];
-  arena[bot1.y][bot1.x]='Y';
-  arena[bot2.y][bot2.x]='X';
-
-  
-  /*
-   * Create two more lines listing each bot's energy.
-   */
-  char energy[14];
-  sprintf(energy, "Y %d\nX %d\n", bot1.energy, bot2.energy);
-
-  
-  /*
-   * Concatenate the arena, the energy lines, and all projectile lines with
-   * bot 1's command path to form the output to be sent to bot 1. Surrounding
-   * quotes are needed for the argument.
-   */
-  strcpy(output, path);
-  strcat(output, " '");
-  strncat(output, *arena, 10*11);
-  strcat(output, energy);
-  int loop;
-  for(loop = 0; loop < cnt_projectiles; loop++)
-  {
-    strcat(output, projectiles[loop]);
-  }
-  strcat(output, "'");
-  
-  
-  /*
-   * Restore the arena.
-   */
-  arena[bot1.y][bot1.x] = at_y;
-  arena[bot2.y][bot2.x] = at_x;
 }
 
 
@@ -1010,6 +640,115 @@ bool move_bot(Bot *bot, Bot *other)
 
 
 /*
+ * Execute a bot and receive its command response.
+ *
+ * Takes:
+ *   bullets: bullets array
+ *   num_bullets: number of elements in the bullets array
+ *   missiles: missiles array
+ *   num_missiles: number of elements in the missiles array
+ *   landmines: landmine array
+ *   num_landmines: number of elements in the landmine array
+ *   bot: pointer to the bot being executed
+ *   other: pointer to the other bot in the match
+ *   debug: if not null, a printf-able arena will be assigned.
+ *
+ * Returns:
+ *   Writes the command response to bot
+ *
+ */
+void exec_bot(int bullets[][3], int num_bullets, int missiles[][3], int num_missiles, int landmines[][2], int num_landmines, Bot *bot, Bot *other, char debug[10*11+1])
+{
+  /*
+   * Build the arena string.
+   */
+  char arena[10][11];
+  memset(arena, '.', 110);
+  int i;
+  for(i = 0; i < 10; i++) arena[i][10] = '\n';
+
+  
+  /*
+   * Build the list of projectile strings.
+   */
+  char proj[MAXWEAPONS*3][10];
+  int num_proj = 0;
+
+  int k = num_bullets;
+  for(i = 0; k > 0; i++)
+  {
+    if(bullets[i][0] != -1)
+    {
+      arena[bullets[i][1]][bullets[i][0]]='B';
+      sprintf(proj[num_proj], "%c %d %d %s\n", 'B', bullets[i][0], bullets[i][1], num2heading(bullets[i][2]));
+      num_proj++;
+      k--;
+    }
+  }
+
+  k = num_missiles;
+  for (i = 0; k > 0; i++)
+  {
+    if(missiles[i][0]!= -1)
+    {
+      arena[missiles[i][1]][missiles[i][0]]='M';
+      sprintf(proj[num_proj], "%c %d %d %s\n", 'M', missiles[i][0], missiles[i][1], num2heading(missiles[i][2]));
+      num_proj++;
+      k--;
+    }
+  }
+
+  k = num_landmines;
+  for (i = 0; k > 0; i++)
+  {
+    if(landmines[i][0]!= -1)
+    {
+      arena[landmines[i][1]][landmines[i][0]]='L';
+      sprintf(proj[num_proj], "%c %d %d\n", 'L', landmines[i][0], landmines[i][1]);
+      num_proj++;
+      k--;
+    }            
+  }
+
+
+  /*
+   * Build the command line string for this bot.
+   */
+  char cl[1024*4];
+  arena[bot->y][bot->x] = 'Y';
+  arena[other->y][other->x] = 'X';
+  char energy[14];
+  sprintf(energy, "Y %d\nX %d\n", bot->energy, other->energy);
+  strcpy(cl, bot->cl);
+  strcat(cl, " '");
+  strncat(cl, *arena, 10*11);
+  strcat(cl, energy);
+  for(i = 0; i < num_proj; i++) strcat(cl, proj[i]);
+  strcat(cl, "'");
+  
+
+  /*
+   * Execute the bot's command line string.
+   */
+  FILE *fp = popen(cl, "r");
+  fgets(bot->cmd, 5, fp);
+  fflush(NULL);
+  pclose(fp);
+  
+  
+  /*
+   * Debug output.
+   */
+  if (debug != NULL)
+  {
+    strncpy(debug, *arena, 10*11);
+    debug[10*11] = 0;
+  }
+}
+
+
+
+/*
  * Add a new bullet to a bullets array.
  *
  * Takes:
@@ -1022,7 +761,10 @@ bool move_bot(Bot *bot, Bot *other)
  */
 void add_bullet(int bullets[][3], int *num_bullets, int x, int y, int d)
 {
-  if (*(num_bullets) == MAXWEAPONS) return; // Damn!
+  //printf("TODO: adding bullet @ %d, %d, %d (currently have %d)\n", x, y, d, *num_bullets);
+  //getchar();
+
+  if (*num_bullets == MAXWEAPONS) return; // Damn!
   
   int i;
   for (i = 0; i < MAXWEAPONS; i++)
@@ -1053,6 +795,8 @@ void add_bullet(int bullets[][3], int *num_bullets, int x, int y, int d)
  */
 void del_bullet(int bullets[][3], int *num_bullets, int index)
 {
+  //printf("TODO: Deleting bullet @ %d (currently have %d)\n", index, *num_bullets);
+  //getchar();
   bullets[index][0]= -1;
   bullets[index][1]= -1;
   bullets[index][2]= -1;
@@ -1062,20 +806,75 @@ void del_bullet(int bullets[][3], int *num_bullets, int index)
 
 
 /*
- * Determine if a bot is collocated with a bullet.
+ * Update the position of all bullets, checking for collisions with bots and walls.
  *
  * Takes:
- *   bot: bot to check
  *   bullets: bullet array
- *   index: index into the bullet array to check
+ *   num_bullets: pointer to the number of bullets in the array
+ *   bot1: Pointer to one of the bots in the match
+ *   bot2: Pointer to the other bot in the match
  *
  * Returns:
- *   0 or 1
+ *   Nothing
  */
-int hit_bullet(Bot bot, int bullets[][3], int index)
+void update_bullets(int bullets[][3], int *num_bullets, Bot *bot1, Bot *bot2)
 {
-  return (   bot.x == bullets[index][0]
-          && bot.y == bullets[index][1]);
+  int k = *num_bullets;
+  int i;
+  for(i = 0; k > 0; i++)
+  {
+    if(bullets[i][0] != -1)
+    {
+      int dx = heading2dx(bullets[i][2]);
+      int dy = heading2dy(bullets[i][2]);
+      int moves;
+      for(moves = 0; moves < 3; moves++)
+      {
+        /*
+         * If the bullet will still be in-bounds, move it.
+         */
+        if(newposinbounds(bullets[i][0], bullets[i][1], dx, dy))
+        {
+          bullets[i][0] += dx;
+          bullets[i][1] += dy;
+          
+          /*
+           * Was bot 1 hit by this bullet?
+           */
+          if (   bot1->x == bullets[i][0]
+              && bot1->y == bullets[i][1])
+          {
+            bot1->energy--;
+            del_bullet(bullets, num_bullets, i);
+            break;
+          }
+          
+          /*
+           * How about bot 2?
+           */
+          else if (   bot2->x == bullets[i][0]
+                   && bot2->y == bullets[i][1])
+          {
+            bot2->energy--;
+            del_bullet(bullets, num_bullets, i);
+            break;
+          }
+        }
+
+        
+        /*
+         * If the bullet has reached an outer wall, remove it.
+         */
+        else
+        {
+          del_bullet(bullets, num_bullets, i);
+          break;
+        }
+      }
+      
+      k--;
+    }
+  }
 }
 
 
@@ -1132,40 +931,127 @@ void del_missile(int missiles[][3], int *num_missiles, int index)
 
 
 
+
 /*
- * Determine if a bot is collocated with a missile.
+ * Update the position of all missiles, checking for collisions with bots and walls.
  *
  * Takes:
- *   bot: bot to check
  *   missiles: missile array
- *   index: index into the missile array to check
+ *   num_missiles: pointer to the number of missiles in the array
+ *   bot1: Pointer to one of the bots in the match
+ *   bot2: Pointer to the other bot in the match
  *
  * Returns:
- *   0 or 1
+ *   Nothing
  */
-int hit_missile(Bot bot, int missiles[][3], int index)
+void update_missiles(int missiles[][3], int *num_missiles, Bot *bot1, Bot *bot2)
 {
-  return (   bot.x == missiles[index][0]
-          && bot.y == missiles[index][1]);
-}
+  int k = *num_missiles;
+  int i;
+  for(i = 0; k > 0; i++)
+  {
+    if(missiles[i][0] != -1)
+    {
+      int dx = heading2dx(missiles[i][2]);
+      int dy = heading2dy(missiles[i][2]);
+      
+      /*
+       * Missiles move two steps at a time.
+       */
+      int moves;
+      for(moves = 0; moves < 2; moves++)
+      {
+        /*
+         * Is the missile still in-bounds?
+         */
+        if(newposinbounds(missiles[i][0], missiles[i][1], dx, dy))
+        {
+          missiles[i][0] += dx;
+          missiles[i][1] += dy;
 
+          
+          /*
+           * Was bot 1 hit by this missile?
+           */
+          if (   bot1->x == missiles[i][0]
+              && bot1->y == missiles[i][1])
+          {
+            bot1->energy -= 3;
+            
+            /*
+             * Was bot 2 caught in the splash damage?
+             */
+            if (   abs(bot2->x - missiles[i][0]) < 2
+                && abs(bot2->y - missiles[i][1]) < 2)
+            {
+              bot2->energy--;
+            }
+            
+            del_missile(missiles, num_missiles, i);
+            break;
+          }
+          
+          
+          /*
+           * How about bot 2?
+           */
+          else if(   bot2->x == missiles[i][0]
+                  && bot2->y == missiles[i][1])
+          {
+            bot2->energy -= 3;
+            
+            /*
+             * Was bot 1 caught in the splash damage?
+             */
+            if (   abs(bot1->x - missiles[i][0]) < 2
+                && abs(bot1->y - missiles[i][1]) < 2)
+            {
+              bot1->energy--;
+            }
+            
+            del_missile(missiles, num_missiles, i);
+            break;
+          }
+        }
+        
+        
+        /*
+         * Has the missile hit a wall?
+         */
+        else
+        {
+          /*
+           * Where did it hit the wall?
+           */
+          missiles[i][0] += dx;
+          missiles[i][1] += dy;
+          
+          /*
+           * Was bot 1 caught in the splash damage?
+           */
+          if (   abs(bot1->x - missiles[i][0]) < 2
+              && abs(bot1->y - missiles[i][1]) < 2)
+          {
+            bot1->energy--;
+          }
+          
+          /*
+           * Was bot 2 caught in the splash damage?
+           */
+          if (   abs(bot2->x - missiles[i][0]) < 2
+              && abs(bot2->y - missiles[i][1]) < 2)
+          {
+            bot2->energy--;
+          }
+          
+          del_missile(missiles, num_missiles, i);
+          break;
+        }
+      }
 
-
-/*
- * Determine if a bot is standing within flak-range of a missile.
- *
- * Takes:
- *   bot: bot to check
- *   missiles: missiles array
- *   index: index into the missiles array to check
- *
- * Returns:
- *   0 or 1
- */
-int flak_missile(Bot bot, int missiles[][3], int index)
-{
-  return (   abs(bot.x - missiles[index][0]) < 2
-          && abs(bot.y - missiles[index][1]) < 2);
+      k--;
+    }
+  }
 }
 
 
@@ -1219,40 +1105,75 @@ void del_landmine(int landmines[][2], int *num_landmines, int index)
 }
 
 
-/*
- * Determine if a bot is standing on a landmine.
- *
- * Takes:
- *   bot: bot to check
- *   landmines: landmines array
- *   index: index into the landmine array to check
- *
- * Returns:
- *   0 or 1
- */
-int hit_landmine(Bot bot, int landmines[][2], int index)
-{
-  return (   bot.x == landmines[index][0]
-          && bot.y == landmines[index][1]);
-}
-
-
 
 /*
- * Determine if a bot is standing within flak-range of a landmine.
+ * Check if a bot is standing on a landmine.
  *
  * Takes:
- *   bot: bot to check
- *   landmines: landmines array
- *   index: index into the landmine array to check
+ *   landmines: landmine array
+ *   num_landmines: pointer to the number of landmines in the array
+ *   bot1: Pointer to one of the bots in the match
+ *   bot2: Pointer to the other bot in the match
  *
  * Returns:
- *   0 or 1
+ *   Nothing
  */
-int flak_landmine(Bot bot, int landmines[][2], int index)
+void update_landmines(int landmines[][2], int *num_landmines, Bot *bot1, Bot *bot2)
 {
-  return (   abs(bot.x - landmines[index][0]) < 2
-          && abs(bot.y - landmines[index][1]) < 2);
+  /*
+   * Loop through each landmine and check if either bot just moved
+   * on top of it.
+   */
+  int k = *num_landmines;
+  int i;
+  for(i = 0; k > 0; i++)
+  {
+    if(landmines[i][0] != -1)
+    {
+      /*
+       * Bot 1 is standing on this landmine?
+       */
+      if(   bot1->x == landmines[i][0]
+         && bot1->y == landmines[i][1])
+      {
+        bot1->energy -= 2;
+        
+        /*
+         * Did bot 2 get hit by shrapnel?
+         */
+        if(   abs(bot2->x - landmines[i][0]) < 2
+           && abs(bot2->y - landmines[i][1]) < 2)
+        {
+          bot2->energy-=1;
+        }
+        
+        del_landmine(landmines, num_landmines, i);
+      }
+      
+      
+      /*
+       * Bot 2 is standing on this landmine?
+       */
+      else if(   bot2->x == landmines[i][0]
+              && bot2->y == landmines[i][1])
+      {
+        bot2->energy -= 2;
+        
+        /*
+         * Did bot 1 get hit by shrapnel?
+         */
+        if(   abs(bot1->x - landmines[i][0]) < 2
+           && abs(bot1->y - landmines[i][1]) < 2)
+        {
+          bot1->energy-=1;
+        }
+        
+        del_landmine(landmines, num_landmines, i);
+      }
+      
+      k--;
+    }
+  }
 }
 
 
