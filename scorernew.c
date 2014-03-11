@@ -428,12 +428,17 @@ int main(int argc, char **argv)
           /*
            * If either (or both!) bots fired the EMP, both bots will be
            * unable to move for the next two rounds. See the -if- check
-           * above.
+           * above. NEW - bot firing EMP loses one energy point.
            */
-           if (   strcmp(b1.cmd, "P") == 0
-               || strcmp(b2.cmd, "P") == 0)
+           if (strcmp(b1.cmd, "P") == 0)
            {
              paralyzedturnsremaining = 2;
+             b1.energy--;
+           }
+           else if(strcmp(b2.cmd, "P") == 0)
+           {
+             paralyzedturnsremaining = 2;
+             b2.energy--;
            }
           
           
