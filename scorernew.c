@@ -20,7 +20,7 @@
 /*
  * If true, each match will be displayed as it is processed.
  */
-#define DISPLAYBOUTS true
+#define DISPLAYBOUTS false
 
 
 /*
@@ -179,17 +179,6 @@ int main(int argc, char **argv)
       
       
       /*
-       * Make sure all our bullet/missile/landmine slots start out empty.
-       */
-      for (loop = 0; loop < MAXWEAPONS; loop++)
-      {
-        bullets[loop][0] = bullets[loop][1] = bullets[loop][2] = -1;
-        missiles[loop][0] = missiles[loop][1] = missiles[loop][2] = -1;
-        landmines[loop][0] = landmines[loop][1] = -1;
-      }
-      
-      
-      /*
        * If either bot fires the EMP, this variable will count down the
        * number of turns paralyzed.
        */
@@ -202,6 +191,20 @@ int main(int argc, char **argv)
       int bout;
       for(bout = 0; bout < BOUTSPERMATCH; bout++)
       {
+      
+      
+        /*
+         * Make sure all our bullet/missile/landmine slots start out empty.
+         */
+        for (loop = 0; loop < MAXWEAPONS; loop++)
+        {
+          bullets[loop][0] = bullets[loop][1] = bullets[loop][2] = -1;
+          missiles[loop][0] = missiles[loop][1] = missiles[loop][2] = -1;
+          landmines[loop][0] = landmines[loop][1] = -1;
+          num_landmines = num_missiles = num_bullets = 0;
+        }
+
+
         /*
          * Randomly pick a bot to be bot 1, and the other to be bot 2. Bot 2
          * has a slight advantage: if both bots attempt to move to the same
