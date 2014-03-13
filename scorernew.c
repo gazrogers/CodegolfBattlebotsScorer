@@ -157,7 +157,8 @@ int main(int argc, char **argv)
        */
       Bot *botI = &bots[i];
       Bot *botJ = &bots[j];
-
+      botI->recent_bouts = 0; 
+      botJ->recent_bouts = 0;
       
       /*
        * Let the games begin...
@@ -225,10 +226,10 @@ int main(int argc, char **argv)
 		     * Vertical positions are random. Both bots start with max energy.
 		     */
         bot1->x = 0; bot1->y = rand()%10;
-        bot1->recent_bouts = 0; bot1->energy = 10;
+        bot1->energy = 10;
         
         bot2->x = 9; bot2->y = rand()%10;
-        bot2->recent_bouts = 0; bot2->energy = 10;
+        bot2->energy = 10;
 
         
 		    /*
@@ -250,8 +251,8 @@ int main(int argc, char **argv)
             printf("\033c");
 
             printf("Match %d of %d\n", match+1, num_matches);
-            printf("Y: %s (%d match wins, %d bout wins, %d energy)\n", bot1->cl, bot1->matches, bot1->bouts, bot1->energy);
-            printf("X: %s (%d match wins, %d bout wins, %d energy)\n", bot2->cl, bot2->matches, bot2->bouts, bot2->energy);
+            printf("Y: %s (%d match wins, %d bout wins, %d energy)\n", bot1->cl, bot1->matches, bot1->recent_bouts, bot1->energy);
+            printf("X: %s (%d match wins, %d bout wins, %d energy)\n", bot2->cl, bot2->matches, bot2->recent_bouts, bot2->energy);
             printf("Bout %d of %d\n", bout+1, BOUTSPERMATCH);
             printf("Round %d\n\n", round+1);
             printf("%s\n", arena);
@@ -342,7 +343,7 @@ int main(int argc, char **argv)
       /*
        * The match is over. Update the winner's stats, if we have one.
        */
-      if(botI->recent_bouts > botJ->recent_bouts) botI->matches++;
+      if (botI->recent_bouts > botJ->recent_bouts) botI->matches++;
       else if(botJ->recent_bouts > botI->recent_bouts) botJ->matches++;
     }
   }
