@@ -20,7 +20,7 @@
 /*
  * If true, each match will be displayed as it is processed.
  */
-#define DISPLAYBOUTS false
+#define DISPLAYBOUTS true
 
 
 /*
@@ -158,32 +158,6 @@ int main(int argc, char **argv)
       Bot *botI = &bots[i];
       Bot *botJ = &bots[j];
 
-       
-      /*
-       * bullets and missiles will contain the coordinates and directions of
-       * all projectiles in flights. Non-existent entries are marked with -1
-       * and the total number of bullets/missiles in existence is tracked.
-       */
-      int bullets[MAXWEAPONS][3];
-      int num_bullets = 0;
-      int missiles[MAXWEAPONS][3];
-      int num_missiles = 0;
-      
-      
-      /*
-       * landmines will contain the coordinates of all landmines dropped and
-       * otherwise work the same as bullets/missiles.
-       */
-      int landmines[MAXWEAPONS][2];
-      int num_landmines = 0;
-      
-      
-      /*
-       * If either bot fires the EMP, this variable will count down the
-       * number of turns paralyzed.
-       */
-      int paralyzedturnsremaining=0;
-      
       
       /*
        * Let the games begin...
@@ -191,8 +165,25 @@ int main(int argc, char **argv)
       int bout;
       for(bout = 0; bout < BOUTSPERMATCH; bout++)
       {
-      
-      
+        /*
+         * bullets and missiles will contain the coordinates and directions of
+         * all projectiles in flights. Non-existent entries are marked with -1
+         * and the total number of bullets/missiles in existence is tracked.
+         */
+        int bullets[MAXWEAPONS][3];
+        int num_bullets = 0;
+        int missiles[MAXWEAPONS][3];
+        int num_missiles = 0;
+        
+        
+        /*
+         * landmines will contain the coordinates of all landmines dropped and
+         * otherwise work the same as bullets/missiles.
+         */
+        int landmines[MAXWEAPONS][2];
+        int num_landmines = 0;
+        
+        
         /*
          * Make sure all our bullet/missile/landmine slots start out empty.
          */
@@ -201,10 +192,16 @@ int main(int argc, char **argv)
           bullets[loop][0] = bullets[loop][1] = bullets[loop][2] = -1;
           missiles[loop][0] = missiles[loop][1] = missiles[loop][2] = -1;
           landmines[loop][0] = landmines[loop][1] = -1;
-          num_landmines = num_missiles = num_bullets = 0;
         }
-
-
+        
+        
+        /*
+         * If either bot fires the EMP, this variable will count down the
+         * number of turns paralyzed.
+         */
+        int paralyzedturnsremaining=0;
+      
+      
         /*
          * Randomly pick a bot to be bot 1, and the other to be bot 2. Bot 2
          * has a slight advantage: if both bots attempt to move to the same
