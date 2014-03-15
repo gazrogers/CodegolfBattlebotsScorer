@@ -327,12 +327,12 @@ int main(int argc, char **argv)
         /*
          * The bout is over. Update the winner's stats, if we have one.
          */
-        if(bot1->energy > bot2->energy)
+        if(bot1->energy > 0 && bot1->energy > bot2->energy)
         {
           bot1->recent_bouts++;
           bot1->bouts++;
         }
-        else if(bot2->energy > bot1->energy)
+        else if(bot2->energy > 0 && bot2->energy > bot1->energy)
         {
           bot2->recent_bouts++;
           bot2->bouts++;
