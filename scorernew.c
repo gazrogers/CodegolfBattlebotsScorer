@@ -297,7 +297,7 @@ int main(int argc, char **argv)
             paralyzedturnsremaining = 2;
             bot1->energy--;
           }
-          else if(strcmp(bot2->cmd, "P") == 0)
+          if(strcmp(bot2->cmd, "P") == 0)
           {
             paralyzedturnsremaining = 2;
             bot2->energy--;
