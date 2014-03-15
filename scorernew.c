@@ -144,7 +144,7 @@ int main(int argc, char **argv)
   /*
    * Round-robin: each bot plays every other bot exactly once.
    */
-  int num_matches = (numbots / 2) * (numbots - 1);
+  int num_matches = (numbots * (numbots - 1) / 2);
   int match = 0;
   int i;
   for(i = 0; i < numbots - 1; i++)
@@ -345,6 +345,7 @@ int main(int argc, char **argv)
        */
       if (botI->recent_bouts > botJ->recent_bouts) botI->matches++;
       else if(botJ->recent_bouts > botI->recent_bouts) botJ->matches++;
+      match++;
     }
   }
 
