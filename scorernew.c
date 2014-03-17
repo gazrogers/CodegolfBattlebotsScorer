@@ -120,7 +120,7 @@ int main(int argc, char **argv)
 	  return 1;
   }
   
-  Bot bots[numbots];
+  Bot *bots = malloc(numbots * sizeof(Bot));
   for (loop = 1; loop < argc; loop++)
   {
     bots[loop - 1].cl = argv[loop];
@@ -358,6 +358,7 @@ int main(int argc, char **argv)
   {
     printf("%s: %d match wins (%d total bout wins)\n", bots[loop].cl, bots[loop].matches, bots[loop].bouts);
   }
+  free(bots);
 }
 
 
